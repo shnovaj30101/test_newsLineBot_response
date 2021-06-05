@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>main page</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    </head>
+    <body>
+        <h1>請輸入指令</h1>
+        <p>指令列&nbsp;&nbsp;<input id="cmd_input"></input></p>
+        <button onclick="submit_cmd()">Submit</button>
+    </body>
+    <div class="show_response_img_region">
+        <h3>response img:</h3>
+    </div>
+    <div class="show_response_text_region">
+        <h3>response text:</h3>
+    </div>
+    <script>
+    function submit_cmd() {
+        let cmd = $('#cmd_input').val();
+        let payload = {
+            cmd
+        };
+        $('#cmd_input').val('');
+        $.ajax({
+            url: 'callback',
+            type: 'POST',
+            contentType: 'application/json',
+            dataType: 'json',
+            data: JSON.stringify(payload),
+            success: function(data, textStatus){
+                console.log(textStatus);
+                console.log(data);
+
+                if (textStatus === 'success') {
+                    $("div.show_response_text_region p").remove();
+                    $("div.show_response_img_region img").remove();
+
+                    if (data.response_text) {
+                        let response_text_elem = $("<p></p>").text(data.response_text);
+                        $("div.show_response_text_region").append(response_text_elem);
+                    }
+                    if (data.response_img_data) {
+                        let response_img_elem = $(`<img src="data:image/png;base64, ${data.response_img_data}"/>`);
+                        $("div.show_response_img_region").append(response_img_elem);
+                    }
+                }
+            }
+        });
+    }
+    </script>
+</html>
