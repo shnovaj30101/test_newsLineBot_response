@@ -3,12 +3,10 @@ from datetime import datetime
 from database import Base
 from sqlalchemy import Column, Index
 from sqlalchemy.types import Integer, Text, String, DateTime, Date
-from sqlalchemy_fulltext import FullText, FullTextSearch
 
 
-class News(FullText, Base):
+class News(Base):
     __tablename__ = 'news_table'
-    __fulltext_columns__ = ('title', 'context')
 
     news_id = Column(String(64), primary_key=True)
     title = Column(String(128), nullable=False)

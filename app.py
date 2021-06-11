@@ -9,17 +9,31 @@ from matplotlib.figure import Figure
 import pymysql
 from datetime import datetime, timedelta
 pymysql.install_as_MySQLdb()
-from sqlalchemy_fulltext import FullText, FullTextSearch
 import sqlalchemy_fulltext.modes as FullTextMode
+from sqlalchemy import or_, and_
 import base64
 import numpy as np
 import re
 import json
-from database import session_executor
+from database import session_wrapper
 import models
 from database import engine
+from models import News
+import math
+from datetime import timedelta
+from matplotlib.font_manager import FontProperties
+
+font = FontProperties(fname="./font/NotoSansCJKtc-Light.otf", size=14)
+'''
+下載方法：
+https://daxpowerbi.com/%E5%A6%82%E4%BD%95%E5%9C%A8win-10%E8%A7%A3%E6%B1%BAmatplotlib%E4%B8%AD%E6%96%87%E9%A1%AF%E7%A4%BA%E7%9A%84%E5%95%8F%E9%A1%8C/
+'''
 
 app = Flask(__name__)
+
+
+START_FORMAT = '''SELECT {0} FROM news_table WHERE '''
+FULLTEXT_SEARCH_FORMAT = '''MATCH (`{0}`, `{1}`) AGAINST ('{2}' IN BOOLEAN MODE)'''
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -42,16 +56,119 @@ def callback():
             return get_unknown_cmd_response()
 
         else:
-            if 'keyword' in query_db_info:
-                with session_executor() as db_session:
-                    session.query(News).filter(FullTextSearch(query_db_info['keyword'], News, FullTextMode.NATURAL))
+            query_result = exec_session_query(query_db_info)
 
-            return {
-                'response_text': 'query_db_info:{0}\ndisplay_info:{1}'.format(
-                    json.dumps(query_db_info, ensure_ascii = False),
-                    json.dumps(display_info, ensure_ascii = False)
-                    ),
-            }
+            if 'show_num' in query_db_info: # todo
+                return {
+                    'response_text': 'query_db_info:{0}\ndisplay_info:{1}'.format(
+                        json.dumps(query_db_info, ensure_ascii = False),
+                        json.dumps(display_info, ensure_ascii = False)
+                        ),
+                }
+            else:
+                return get_statistic_figure_response(query_result, query_db_info, display_info)
+
+
+def get_statistic_figure_response(query_result, query_db_info, display_info):
+    if len(query_result) == 0:
+        return {
+            'response_text': 'No data result\nquery_db_info:{0}\ndisplay_info:{1}'.format(
+                json.dumps(query_db_info, ensure_ascii = False),
+                json.dumps(display_info, ensure_ascii = False)
+                ),
+        }
+    all_day_num = (query_result[-1]['post_time'] - query_result[0]['post_time']).days + 1
+
+    if all_day_num/display_info['days_unit'] > 30:
+        display_info['days_unit'] = math.ceil(all_day_num/30)
+    # print('all_day_num', all_day_num)
+    # print('display_info["days_unit"]', display_info["days_unit"])
+
+    stat_info = [{
+            'date': query_result[0]['post_time'],
+            'count': 0,
+        }]
+
+    for result_item in query_result:
+        while (result_item['post_time'] - stat_info[-1]['date']).days + 1 > display_info['days_unit']:
+            stat_info.append({
+                'date': stat_info[-1]['date'] + timedelta(days=display_info['days_unit']),
+                'count': 0,
+                })
+
+        stat_info[-1]['count'] += 1
+
+    # print(stat_info)
+
+    fig = Figure(figsize=(9,6))
+    # reference: https://matplotlib.org/3.3.4/api/_as_gen/matplotlib.figure.Figure.html
+    axis = fig.add_subplot(1, 1, 1)
+    if 'keyword' not in query_db_info:
+        axis.set_title("統計結果(keyword:None)", fontproperties=font)
+    else:
+        axis.set_title("統計結果(keyword:{0})".format(query_db_info['keyword']), fontproperties=font)
+
+    axis.set_xlabel('日期', fontproperties=font)
+    axis.set_ylabel('新聞數', fontproperties=font)
+    # axis.set_xticklabels([ stat_item['date'].strftime('%Y%m%d') for stat_item in stat_info], rotation=45, ha='right')
+    axis.set_xticklabels([ stat_item['date'].strftime('%Y%m%d') for stat_item in stat_info], rotation=90)
+    # reference: https://www.delftstack.com/zh-tw/howto/matplotlib/how-to-rotate-x-axis-tick-label-text-in-matplotlib/
+    axis.bar([ stat_item['date'].strftime('%Y%m%d') for stat_item in stat_info], [ stat_item['count'] for stat_item in stat_info])
+
+    fig.tight_layout()
+
+    output = io.BytesIO()
+    FigureCanvasAgg(fig).print_png(output)
+    data = base64.encodestring(output.getvalue()).decode('utf-8')
+
+    return {
+        'response_img_data': data,
+        'response_text': 'query_db_info:{0}\ndisplay_info:{1}'.format(
+            json.dumps(query_db_info, ensure_ascii = False),
+            json.dumps(display_info, ensure_ascii = False)
+            ),
+    }
+
+def exec_session_query(query_db_info):
+    with session_wrapper() as session:
+        if 'show_num' in query_db_info: # todo
+            pass
+        else:
+            if 'keyword' in query_db_info:
+                start_cmd = START_FORMAT.format("`{0}`,`{1}`".format('post_time', 'news_id'))
+                constraint_cmd_list = []
+                constraint_cmd_list.append(FULLTEXT_SEARCH_FORMAT.format('title', 'content', query_db_info['keyword']))
+                if 'date_range' in query_db_info:
+                    if 'start' in query_db_info['date_range'] and 'end' in query_db_info['date_range']:
+                        date_range_cmd = "`post_time` BETWEEN '{0}' AND '{1}'".format(query_db_info['date_range']['start'], query_db_info['date_range']['end'])
+                    elif 'start' in query_db_info['date_range']:
+                        date_range_cmd = "`post_time` >= '{0}'".format(query_db_info['date_range']['start'])
+                    elif 'end' in query_db_info['date_range']:
+                        date_range_cmd = "`post_time` <= '{0}'".format(query_db_info['date_range']['end'])
+
+                    constraint_cmd_list.append(date_range_cmd)
+
+                sort_cmd = ' ORDER BY `{0}`'.format('post_time')
+
+                merged_cmd = start_cmd + ' AND '.join(constraint_cmd_list) + sort_cmd
+                merged_cmd += ';'
+
+                query_result = session.execute(merged_cmd)
+                # return query_result.mappings()
+                return query_result.mappings().all()
+
+            else:
+                query = session.query(News.news_id, News.post_time)
+                if 'date_range' in query_db_info:
+                    if 'start' in query_db_info['date_range']:
+                        query = query.filter(News.post_time >= query_db_info['date_range']['start'])
+                    if 'end' in query_db_info['date_range']:
+                        query = query.filter(News.post_time <= query_db_info['date_range']['end'])
+
+                query = query.order_by(News.post_time)
+
+                # return map(lambda x: x._asdict(), query)
+                return list(map(lambda x: x._asdict(), query))
 
 
 def parse_keyword(text, query_db_info, display_info):
@@ -69,6 +186,7 @@ def parse_show_num(text, query_db_info, display_info):
         show_num = 20
 
     display_info['show_num'] = show_num
+    query_db_info['show_num'] = show_num
 
     return True
 
@@ -116,6 +234,8 @@ def parse_date(text, query_db_info, display_info):
                 'end': datetime.strptime(end_date_str, '%Y%m%d').strftime('%Y/%m/%d'),
                 'start': datetime.strptime(start_date_str, '%Y%m%d').strftime('%Y/%m/%d'),
                 }
+
+    display_info['days_unit'] = 1
 
     if other_part is not None:
         if other_part.isnumeric():

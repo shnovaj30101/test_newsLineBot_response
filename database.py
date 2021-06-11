@@ -14,7 +14,7 @@ db_session = DBSession()
 Base = declarative_base()
 
 @contextmanager
-def session_executor(session=db_session):
+def session_wrapper(session=db_session):
     try:
         yield session
         session.commit()
