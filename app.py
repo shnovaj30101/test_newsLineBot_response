@@ -9,7 +9,6 @@ from matplotlib.figure import Figure
 import pymysql
 from datetime import datetime, timedelta
 pymysql.install_as_MySQLdb()
-import sqlalchemy_fulltext.modes as FullTextMode
 from sqlalchemy import or_, and_
 import base64
 import numpy as np
@@ -23,7 +22,7 @@ import math
 from datetime import timedelta
 from matplotlib.font_manager import FontProperties
 
-font = FontProperties(fname="./font/NotoSansCJKtc-Light.otf", size=14)
+font = FontProperties(fname="./font/NotoSerifCJKtc-Light.otf", size=14)
 '''
 下載方法：
 https://daxpowerbi.com/%E5%A6%82%E4%BD%95%E5%9C%A8win-10%E8%A7%A3%E6%B1%BAmatplotlib%E4%B8%AD%E6%96%87%E9%A1%AF%E7%A4%BA%E7%9A%84%E5%95%8F%E9%A1%8C/
