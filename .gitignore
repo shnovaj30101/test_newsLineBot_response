@@ -139,3 +139,4 @@ cython_debug/
 
 tne_env/
 font/
+hostinger_start_app.sh

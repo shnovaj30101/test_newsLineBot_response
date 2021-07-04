@@ -1,6 +1,8 @@
 
 from datetime import datetime
-from database import Base
+from sqlalchemy.ext.declarative import declarative_base
+Base = declarative_base()
+
 from sqlalchemy import Column, Index
 from sqlalchemy.types import Integer, Text, String, DateTime, Date
 

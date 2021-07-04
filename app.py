@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+from argparse import ArgumentParser
 import io
 import random
 import pandas as pd
@@ -14,13 +15,13 @@ import base64
 import numpy as np
 import re
 import json
-from database import session_wrapper
+from database import DataBase
 import models
-from database import engine
 from models import News
 import math
 from datetime import timedelta
 from matplotlib.font_manager import FontProperties
+import getpass
 
 font = FontProperties(fname="./font/NotoSerifCJKtc-Light.otf", size=14)
 '''
@@ -29,10 +30,6 @@ https://daxpowerbi.com/%E5%A6%82%E4%BD%95%E5%9C%A8win-10%E8%A7%A3%E6%B1%BAmatplo
 '''
 
 app = Flask(__name__)
-
-
-START_FORMAT = '''SELECT {0} FROM news_table WHERE '''
-FULLTEXT_SEARCH_FORMAT = '''MATCH (`{0}`, `{1}`) AGAINST ('{2}' IN BOOLEAN MODE)'''
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -129,7 +126,7 @@ def get_statistic_figure_response(query_result, query_db_info, display_info):
     }
 
 def exec_session_query(query_db_info):
-    with session_wrapper() as session:
+    with database.session_wrapper() as session:
         if 'show_num' in query_db_info: # todo
             pass
         else:
@@ -304,6 +301,34 @@ def get_unknown_cmd_response():
 def home():
     return render_template("home.html")
 
+
+class ArgumentParserError(Exception):
+    pass
+
+class ThrowingArgumentParser(ArgumentParser):
+    def error(self, message):
+        raise ArgumentParserError(message)
+
+def process_args():
+    parser = ThrowingArgumentParser(description="")
+    parser.add_argument("-t", "--table_name", default='news_table', help="")
+    parser.add_argument("-mu", "--mysql_user", default='root', help="")
+    parser.add_argument("-mP", "--mysql_password", default=None, help="")
+    parser.add_argument("-mh", "--mysql_hostname", default='localhost', help="")
+    parser.add_argument("-mp", "--mysql_port", type=int, default=3306, help="")
+    parser.add_argument("-md", "--mysql_database", default='news_data', help="")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    app.run()
+    args = process_args()
+
+    if args.mysql_password is None:
+        args.mysql_password = getpass.getpass('Password:')
+
+    START_FORMAT = f'SELECT {{0}} FROM {args.table_name} WHERE '
+    FULLTEXT_SEARCH_FORMAT = '''MATCH (`{0}`, `{1}`) AGAINST ('{2}' IN BOOLEAN MODE)'''
+
+    with DataBase(args) as database:
+        app.run()
 
