@@ -22,6 +22,7 @@ import math
 from datetime import timedelta
 from matplotlib.font_manager import FontProperties
 import getpass
+from imgurpython import ImgurClient
 
 font = FontProperties(fname="./font/NotoSerifCJKtc-Light.otf", size=14)
 '''
@@ -37,9 +38,7 @@ def callback():
     cmd = cmd.strip()
     print(cmd)
 
-    if cmd == 'test_plot':
-        return get_test_plot_response()
-    elif cmd == 'u' or cmd == 'url':
+    if cmd == 'u' or cmd == 'url':
         return get_url_response()
     elif cmd == 'man' or cmd == 'manual':
         return get_manual_response()
@@ -117,6 +116,8 @@ def get_statistic_figure_response(query_result, query_db_info, display_info):
     FigureCanvasAgg(fig).print_png(output)
     data = base64.encodestring(output.getvalue()).decode('utf-8')
 
+    upload_imgur(data)
+
     return {
         'response_img_data': data,
         'response_text': 'query_db_info:{0}\ndisplay_info:{1}'.format(
@@ -124,6 +125,14 @@ def get_statistic_figure_response(query_result, query_db_info, display_info):
             json.dumps(display_info, ensure_ascii = False)
             ),
     }
+
+def upload_imgur(data):
+    upload_imgur_data = {
+        'image': data,
+        'type': 'base64',
+    }
+    upload_result = imgur_client.make_request('POST', 'upload', upload_imgur_data, True)
+    print('imgur upload result: {0}'.format(upload_result))
 
 def exec_session_query(query_db_info):
     with database.session_wrapper() as session:
@@ -268,20 +277,6 @@ def parse_all_cmd(cmd, query_db_info, display_info):
                 parse_date(cmd_part_list[1], query_db_info, display_info) and \
                 parse_source(cmd_part_list[2], query_db_info, display_info)
 
-
-def get_test_plot_response():
-    fig = Figure()
-    axis = fig.add_subplot(1, 1, 1)
-    x_points = range(50)
-    axis.plot(x_points, [random.randint(1, 30) for x in x_points])
-
-    output = io.BytesIO()
-    FigureCanvasAgg(fig).print_png(output)
-    data = base64.encodestring(output.getvalue()).decode('utf-8')
-    return {
-        'response_img_data': data,
-    }
-
 def get_url_response():
     return {
         'response_text': "給你一個神祕的url ><",
@@ -317,6 +312,7 @@ def process_args():
     parser.add_argument("-mh", "--mysql_hostname", default='localhost', help="")
     parser.add_argument("-mp", "--mysql_port", type=int, default=3306, help="")
     parser.add_argument("-md", "--mysql_database", default='news_data', help="")
+    parser.add_argument("-ima", "--imgur_auth_file", default='imgur_auth', help="")
     return parser.parse_args()
 
 
@@ -328,6 +324,12 @@ if __name__ == "__main__":
 
     START_FORMAT = f'SELECT {{0}} FROM {args.table_name} WHERE '
     FULLTEXT_SEARCH_FORMAT = '''MATCH (`{0}`, `{1}`) AGAINST ('{2}' IN BOOLEAN MODE)'''
+
+    with open(args.imgur_auth_file, 'rt') as rf:
+        client_id = rf.readline().strip()
+        client_secret = rf.readline().strip()
+
+        imgur_client = ImgurClient(client_id, client_secret)
 
     with DataBase(args) as database:
         app.run()
