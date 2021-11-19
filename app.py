@@ -22,7 +22,7 @@ import math
 from datetime import timedelta
 from matplotlib.font_manager import FontProperties
 import getpass
-from imgurpython import ImgurClient
+# from imgurpython import ImgurClient
 
 font = FontProperties(fname="./font/NotoSerifCJKtc-Light.otf", size=14)
 '''
@@ -46,6 +46,7 @@ def callback():
         query_db_info = {}
         display_info = {}
         success = parse_all_cmd(cmd, query_db_info, display_info)
+        # print(query_db_info)
 
         if not success:
             return get_unknown_cmd_response()
@@ -116,7 +117,7 @@ def get_statistic_figure_response(query_result, query_db_info, display_info):
     FigureCanvasAgg(fig).print_png(output)
     data = base64.encodestring(output.getvalue()).decode('utf-8')
 
-    upload_imgur(data)
+    # upload_imgur(data)
 
     return {
         'response_img_data': data,
@@ -126,13 +127,13 @@ def get_statistic_figure_response(query_result, query_db_info, display_info):
             ),
     }
 
-def upload_imgur(data):
-    upload_imgur_data = {
-        'image': data,
-        'type': 'base64',
-    }
-    upload_result = imgur_client.make_request('POST', 'upload', upload_imgur_data, True)
-    print('imgur upload result: {0}'.format(upload_result))
+# def upload_imgur(data):
+    # upload_imgur_data = {
+        # 'image': data,
+        # 'type': 'base64',
+    # }
+    # upload_result = imgur_client.make_request('POST', 'upload', upload_imgur_data, True)
+    # print('imgur upload result: {0}'.format(upload_result))
 
 def exec_session_query(query_db_info):
     with database.session_wrapper() as session:
@@ -312,7 +313,7 @@ def process_args():
     parser.add_argument("-mh", "--mysql_hostname", default='localhost', help="")
     parser.add_argument("-mp", "--mysql_port", type=int, default=3306, help="")
     parser.add_argument("-md", "--mysql_database", default='news_data', help="")
-    parser.add_argument("-ima", "--imgur_auth_file", default='imgur_auth', help="")
+    # parser.add_argument("-ima", "--imgur_auth_file", default='imgur_auth', help="")
     return parser.parse_args()
 
 
@@ -325,11 +326,11 @@ if __name__ == "__main__":
     START_FORMAT = f'SELECT {{0}} FROM {args.table_name} WHERE '
     FULLTEXT_SEARCH_FORMAT = '''MATCH (`{0}`, `{1}`) AGAINST ('{2}' IN BOOLEAN MODE)'''
 
-    with open(args.imgur_auth_file, 'rt') as rf:
-        client_id = rf.readline().strip()
-        client_secret = rf.readline().strip()
+    # with open(args.imgur_auth_file, 'rt') as rf:
+        # client_id = rf.readline().strip()
+        # client_secret = rf.readline().strip()
 
-        imgur_client = ImgurClient(client_id, client_secret)
+        # imgur_client = ImgurClient(client_id, client_secret)
 
     with DataBase(args) as database:
         app.run()

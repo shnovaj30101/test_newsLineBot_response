@@ -140,4 +140,5 @@ cython_debug/
 tne_env/
 font/
 hostinger_start_app.sh
+hostinger_db_app.sh
 imgur_auth
